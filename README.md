@@ -19,8 +19,5 @@ This project is an interactive dashboard built in R using flexdashboard and shin
 ## Dataset
 Source: [Kaggle - Chocolate Sales Dataset](https://www.kaggle.com/datasets/)
 
-## Screenshot
-![Dashboard Preview](dashboard_screenshot.png)
-
 ---
 Made with ❤️ in R
