@@ -1,0 +1,264 @@
+---
+title: "Cool Dashboard"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+#Importing Libraries
+library(flexdashboard)
+library(tidyverse)
+library(highcharter)
+library(viridis)
+library(htmltools)
+library(gt)
+library(openxlsx)
+library(readxl)
+library(lubridate)
+library(shiny)
+```
+
+```{r}
+#Importing data
+data <- read_excel("D:/Kaggle/ChocolateSales/Chocolate Sales.xlsx")
+
+data <- data %>% 
+  rename(Boxes_Shipped = `Boxes Shipped`)
+```
+
+# Chocolates
+
+## Column {.tabset .tabset-fade data-width="600"}
+
+### Volume
+
+```{r}
+# Colors
+custom_colors <- viridis::mako(n = 22)
+#Most Popular Chocolates by number of boxes shipped
+data %>%
+  group_by(Product) %>%
+  summarize(Boxes_Shipped = sum(Boxes_Shipped)) %>%
+  arrange(desc(Boxes_Shipped)) %>%
+  hchart('column',hcaes(x = Product, y = Boxes_Shipped , color = custom_colors)) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_tooltip(pointFormat = '<b>Number of Boxes Shipped : </b> {point.y} <br>') %>%
+  hc_title(text = 'Products and Volume of Shipping',
+           style = list(fontsize = '15px',fontWeight = 'bold')) %>%
+  hc_credits(enabled = TRUE , text = 'Kaggle/ChocolatesSales')
+  
+
+```
+
+### Chocolates
+
+```{r}
+
+# Step 1: Get top 3 products per country
+top_products <- data %>%
+  group_by(Country, Product) %>%
+  summarize(Revenue = sum(Amount, na.rm = TRUE), .groups = "drop") %>%
+  group_by(Country) %>%
+  slice_max(order_by = Revenue, n = 3)
+
+# Step 2: Highcharter stacked column plot
+top_products %>%
+  hchart("column", hcaes(x = Country, y = Revenue, group = Product)) %>%
+  hc_chart(type = "column") %>%
+  hc_plotOptions(column = list(stacking = "normal")) %>%
+  hc_title(text = "Top 3 Best-Selling Chocolates in Each Country",
+           style = list(fontsize = '15px',fontWeight = 'bold')) %>%
+  hc_xAxis(title = list(text = "Country")) %>%
+  hc_yAxis(title = list(text = "Total Revenue")) %>%
+  hc_tooltip(shared = TRUE, pointFormat = "<b>{series.name}</b>: {point.y}") %>%
+  hc_colors(viridisLite::viridis(3)) %>%  # Optional color palette
+  hc_add_theme(hc_theme_google())%>%
+  hc_legend(enabled = FALSE)
+ 
+ 
+```
+
+### Demand
+
+```{r}
+#Custom color package
+custom_colors <- viridis::mako(8)
+
+
+data %>%
+  mutate(Month = floor_date(Date, "month")) %>%
+  group_by(Month) %>%
+  summarize(Boxes_Shipped = sum(Boxes_Shipped),.groups = 'drop') %>%
+  mutate(Month_ts = datetime_to_timestamp(Month)) %>%
+  hchart('column',hcaes(x = Month_ts , y = Boxes_Shipped)) %>%
+  hc_xAxis(type = "datetime") %>%  # Tells Highcharts it's a date axis
+  hc_colors(custom_colors) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_tooltip(pointFormat = '<b>Boxes Shipped: </b> {point.y} <br>') %>%
+  hc_title(text = 'Shipping According to Month of Year',
+           style = list(fontsize = '15px',fontWeight = 'bold')) %>%
+  hc_credits(enabled = TRUE , text = 'Kaggle/ChocolatesSales')
+
+
+```
+
+## Column {data-width="400"}
+
+### 
+
+```{r}
+custom_colors <- viridis::mako(n = 6)
+data %>%
+  group_by(Country) %>% filter(Product == '50% Dark Bites') %>%
+  summarize(count = sum(Boxes_Shipped)) %>%
+  hchart('pie', hcaes( x = Country , y = count , color = custom_colors)) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_tooltip(pointFormat = '<b>Proportion :</b> {point.percentage:.2f}%') %>%
+  hc_title(text = '50% Dark Bites Shipping by Country',
+           style = list(fontsize = '15px', fontWeight = 'bold'))
+
+  
+  
+  
+```
+
+### 
+
+```{r}
+#This is a data table
+df1 <- data %>% group_by(`Sales Person`) %>%
+  summarize(Total_Sales = sum(Amount)) %>%
+  arrange(desc(Total_Sales)) %>%
+  head(10) 
+#HTML Table
+div(style = 'height:300px; overflow-y:scroll',gt(df1) %>%
+      tab_header(title = md('Top Sales Person'),
+                 subtitle = md('By Sales Amount')) %>%
+      opt_table_font(font = list(google_font('Chivo'),default_fonts())) %>%
+      tab_style(location = cells_column_labels(columns = everything()),
+                style = list(cell_borders(sides = 'bottom',
+                                          weight = px(2)),
+                             cell_text(weight = 'bold'))) %>%
+      tab_options(table.font.size = px(12L),
+                  table.border.top.style = 'none',
+                  column_labels.border.bottom.width = 2,
+                  table_body.border.top.style = 'none',
+                  data_row.padding = px(3))
+      
+    )
+```
+
+## Column {data-width="500"}
+
+### 
+
+```{r}
+library(dplyr)
+library(highcharter)
+
+# Example: Replace `data` and `Amount` with your actual dataset and column
+amount_data <- data$Amount
+
+# Compute histogram (scaled to density)
+hist_data <- hist(amount_data, breaks = 30, plot = FALSE)
+hist_df <- data.frame(
+  x = hist_data$mids,
+  y = hist_data$density
+)
+
+# Compute density curve
+density_data <- density(amount_data)
+density_df <- data.frame(
+  x = density_data$x,
+  y = density_data$y
+)
+# Compute stats
+mean_val <- mean(amount_data)
+mode_val <- density_df$x[which.max(density_df$y)]  # Mode is the peak of density
+min_val <- min(amount_data)
+max_val <- max(amount_data)
+
+# Define vertical lines for annotations
+plot_lines <- list(
+  list(value = mean_val, color = "blue", width = 2, dashStyle = "Dash", label = list(text = "Mean", style = list(color = "blue"))),
+  list(value = mode_val, color = "red", width = 2, dashStyle = "Dash", label = list(text = "Mode", style = list(color = "red")))
+)
+# Create interactive plot
+highchart() %>%
+  hc_add_series(data = hist_df, type = "column", hcaes(x = x, y = y),
+                name = "Histogram", color = "skyblue") %>%
+  hc_add_series(data = density_df, type = "spline", hcaes(x = x, y = y),
+                name = "Density", color = "red") %>%
+  hc_title(text = "Distribution of Daily Sales Amount per Salesperson",
+           style = list(fontsize = '15px', fontWeight = 'bold')) %>%
+  hc_xAxis(
+    title = list(text = "Amount"),
+    plotLines = plot_lines
+  ) %>%
+  hc_yAxis(title = list(text = "Density")) %>%
+  hc_tooltip(shared = TRUE, valueDecimals = 3) %>%
+  hc_add_theme(hc_theme_google())
+
+```
+
+### 
+
+```{r}
+custom_colors <- viridis::mako(n = 5)
+
+data %>% group_by(Country) %>%
+  summarize(Total_Revenue = sum(Amount)) %>%
+  arrange(desc(Total_Revenue))%>%
+  top_n(.,5) %>%
+  hchart('pie', hcaes( x = Country , y = Total_Revenue , color = custom_colors)) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_tooltip(pointFormat = '<b>Proportion :</b> {point.percentage:.2f}%') %>%
+  hc_title(text = 'Top 5 countries by sales revenue',
+           style = list(fontsize = '15px', fontWeight = 'bold'))
+
+
+```
+
+## Column {data-width="500"}
+
+### 
+
+```{r}
+data %>%
+  mutate(Weekday = wday(Date, label = TRUE, abbr = FALSE)) %>%
+  group_by(Weekday) %>%
+  summarise(Total_Revenue = sum(Amount, na.rm = TRUE)) %>%
+  hchart("column", hcaes(x = Weekday, y = Total_Revenue)) %>%
+  hc_title(text = "Total Sales Revenue by Weekday",
+           style = list(fontsize = '15px', fontWeight = 'bold')) %>%
+  hc_xAxis(title = list(text = "Weekday")) %>%
+  hc_yAxis(title = list(text = "Revenue")) %>%
+  hc_colors("#1f77b4") %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_tooltip(pointFormat = "<b>Revenue: </b> {point.y}")
+
+```
+
+### 
+
+```{r}
+### Revenue Generated by different products
+# Colors
+custom_colors <- viridis :: plasma(n = 5)
+
+#Plot of Product and Amount generated in total
+data %>%
+  group_by(Product) %>%
+  summarize(Total_Amount = sum(Amount)) %>%
+  arrange(desc(Total_Amount))%>%
+  top_n(5,wt =Total_Amount) %>%
+  hchart('column',hcaes(x = Product, y = Total_Amount , color = custom_colors)) %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_tooltip(pointFormat = '<b>Total Revenue : </b> {point.y} <br>') %>%
+  hc_title(text = 'Top 5 Chocolates by Revenue',
+           style = list(fontsize = '15px',fontWeight = 'bold')) %>%
+  hc_credits(enabled = TRUE , text = 'Kaggle/ChocolatesSales')
+  
+```
